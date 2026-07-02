@@ -7,8 +7,12 @@ TOKEN = "8670803464:AAE-DBwo7Nl8YoNGbDP6YPt_aUqaWdQLzqU"
 
 bot = telebot.TeleBot(TOKEN)
 
-# ===== УДАЛЯЕМ WEBHOOK (ОБЯЗАТЕЛЬНО!) =====
-bot.remove_webhook()
+# ===== УДАЛЯЕМ WEBHOOK =====
+try:
+    bot.remove_webhook()
+    print("✅ Webhook удалён")
+except Exception as e:
+    print(f"⚠️ Ошибка удаления webhook: {e}")
 
 RULES = """
 📢 **ПРАВИЛА КОММЕНТАРИЕВ**
@@ -23,19 +27,34 @@ RULES = """
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Я буду модерировать комментарии в канале.")
+    bot.reply_to(message, "🤖 Бот запущен! Теперь я буду писать правила в комментарии к постам.")
 
+# ===== НОВЫЙ ПОСТ В КАНАЛЕ — ПИШЕМ ПРАВИЛА В КОММЕНТЫ =====
 @bot.channel_post_handler(func=lambda message: True)
 def new_post(message):
-    """Новый пост в канале — пишем правила"""
-    bot.send_message(message.chat.id, RULES, reply_to_message_id=message.message_id)
+    try:
+        # Отправляем правила КАК ОТВЕТ на пост (в комментарии)
+        bot.send_message(
+            message.chat.id, 
+            RULES, 
+            reply_to_message_id=message.message_id  # ЭТО ГЛАВНОЕ! отвечаем на пост
+        )
+        print(f"✅ Правила отправлены в комментарии к посту {message.message_id}")
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
 
+# ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
 BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
 URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
 
 @bot.message_handler(func=lambda message: True)
 def moderate(message):
+    # Пропускаем сообщения от бота
     if message.from_user.id == bot.get_me().id:
+        return
+    
+    # Если это не комментарий к посту (например, ЛС) — игнорируем
+    if message.chat.type not in ["group", "supergroup"]:
         return
     
     text = message.text or ""
@@ -44,33 +63,50 @@ def moderate(message):
     # Мат
     for word in BAD_WORDS:
         if word in text_lower:
-            bot.delete_message(message.chat.id, message.message_id)
-            bot.send_message(message.chat.id, "⚠️ Удалено: мат", reply_to_message_id=message.message_id)
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+                bot.send_message(message.chat.id, "⚠️ Удалено: мат")
+                print(f"🗑️ Удалён комментарий с матом от {message.from_user.username}")
+            except Exception as e:
+                print(f"❌ Ошибка удаления: {e}")
             return
     
     # Ссылки
     if re.search(URL_PATTERN, text):
-        bot.delete_message(message.chat.id, message.message_id)
-        bot.send_message(message.chat.id, "⚠️ Удалено: ссылка", reply_to_message_id=message.message_id)
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+            bot.send_message(message.chat.id, "⚠️ Удалено: ссылка")
+            print(f"🗑️ Удалён комментарий со ссылкой от {message.from_user.username}")
+        except Exception as e:
+            print(f"❌ Ошибка удаления: {e}")
         return
     
     # Спам
     if "!!!!!" in text or "?????" in text:
-        bot.delete_message(message.chat.id, message.message_id)
-        bot.send_message(message.chat.id, "⚠️ Удалено: спам", reply_to_message_id=message.message_id)
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+            bot.send_message(message.chat.id, "⚠️ Удалено: спам")
+            print(f"🗑️ Удалён комментарий со спамом от {message.from_user.username}")
+        except Exception as e:
+            print(f"❌ Ошибка удаления: {e}")
         return
     
     # Капс
     upper = sum(1 for c in text if c.isupper())
     if len(text) > 10 and upper / len(text) > 0.7:
-        bot.delete_message(message.chat.id, message.message_id)
-        bot.send_message(message.chat.id, "⚠️ Удалено: капс", reply_to_message_id=message.message_id)
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+            bot.send_message(message.chat.id, "⚠️ Удалено: капс")
+            print(f"🗑️ Удалён комментарий с капсом от {message.from_user.username}")
+        except Exception as e:
+            print(f"❌ Ошибка удаления: {e}")
         return
 
 if __name__ == "__main__":
     print("=" * 50)
     print("🤖 Бот запущен!")
-    print("📌 Режим: polling")
+    print("📌 Я буду писать правила в комментарии к постам")
+    print("📌 И удалять мат/ссылки/спам/капс в комментариях")
     print("=" * 50)
     
     while True:
