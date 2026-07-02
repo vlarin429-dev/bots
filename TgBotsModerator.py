@@ -26,40 +26,16 @@ RULES = """Запрещено 🟡
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения.")
+    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения и сделай админом.")
 
 # ===== КОМАНДА ДЛЯ ПОЛУЧЕНИЯ ID =====
 @bot.message_handler(commands=['getid'])
 def get_id(message):
     bot.reply_to(message, f"🆔 ID этого чата: `{message.chat.id}`")
 
-# ===== НОВЫЙ ПОСТ В КАНАЛЕ — ПИШЕМ ПРАВИЛА В КОММЕНТЫ =====
-@bot.channel_post_handler(func=lambda message: True)
-def new_post(message):
-    try:
-        # Отправляем правила в группу обсуждения
-        # Используем reply_to_message_id, чтобы ответить на сообщение о посте
-        bot.send_message(
-            DISCUSSION_GROUP_ID,
-            RULES,
-            reply_to_message_id=message.message_id
-        )
-        print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        # Если не получилось ответить — просто отправляем в чат
-        try:
-            bot.send_message(DISCUSSION_GROUP_ID, RULES)
-            print("✅ Правила отправлены в чат (без ответа)")
-        except Exception as e2:
-            print(f"❌ Ошибка: {e2}")
-
-# ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
-BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
-URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
-
+# ===== ГЛАВНЫЙ ОБРАБОТЧИК СООБЩЕНИЙ В ГРУППЕ =====
 @bot.message_handler(func=lambda message: True)
-def moderate(message):
+def handle_messages(message):
     # Пропускаем сообщения от бота
     if message.from_user.id == bot.get_me().id:
         return
@@ -68,12 +44,23 @@ def moderate(message):
     if message.chat.id != DISCUSSION_GROUP_ID:
         return
     
-    # Если это сообщение о новом посте (от канала) — игнорируем
-    if message.from_user.id == 777000:  # ID Telegram (системные сообщения)
+    # Проверяем, есть ли в сообщении ссылка на канал
+    # Это означает, что кто-то поделился постом из канала (или системное сообщение)
+    if message.text and ("t.me/" in message.text or "telegram" in message.text.lower()):
+        # Отправляем правила в ответ на это сообщение
+        try:
+            bot.reply_to(message, RULES)
+            print(f"✅ Правила отправлены в ответ на сообщение {message.message_id}")
+        except Exception as e:
+            print(f"❌ Ошибка отправки правил: {e}")
         return
     
+    # ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
     text = message.text or ""
     text_lower = text.lower()
+    
+    BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
+    URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
     
     # Мат
     for word in BAD_WORDS:
