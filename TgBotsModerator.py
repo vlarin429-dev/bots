@@ -15,39 +15,46 @@ except Exception as e:
     print(f"⚠️ Ошибка удаления webhook: {e}")
 
 # ===== ID ГРУППЫ ОБСУЖДЕНИЯ =====
-# СЮДА ВСТАВЬ ID ГРУППЫ, ГДЕ ДОЛЖНЫ БЫТЬ КОММЕНТАРИИ
-# (не канал, а группа!)
-DISCUSSION_GROUP_ID = -1001234567890  # ЗАМЕНИ НА СВОЙ ID ГРУППЫ!
+# НАЙДИ ID СВОЕЙ ГРУППЫ (напиши /getid в группе)
+DISCUSSION_GROUP_ID = -1002054714983  # ЗАМЕНИ НА СВОЙ ID!
 
-RULES = """
-📢 **ПРАВИЛА КОММЕНТАРИЕВ**
-
-1️⃣ Без мата и оскорблений
-2️⃣ Без рекламы и ссылок
-3️⃣ Без спама и флуда
-4️⃣ Без капса
-
-Нарушение = удаление комментария.
-"""
+# ===== ПРАВИЛА =====
+RULES = """Запрещено 🟡
+1. Любой спам, реклама, ссылки
+2. Любые материалы 18+
+3. Распространение личных данных"""
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Я буду писать правила в обсуждения.")
+    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения.")
 
-# ===== НОВЫЙ ПОСТ В КАНАЛЕ — ПИШЕМ В ГРУППУ ОБСУЖДЕНИЯ =====
+# ===== КОМАНДА ДЛЯ ПОЛУЧЕНИЯ ID =====
+@bot.message_handler(commands=['getid'])
+def get_id(message):
+    bot.reply_to(message, f"🆔 ID этого чата: `{message.chat.id}`")
+
+# ===== НОВЫЙ ПОСТ В КАНАЛЕ — ПИШЕМ ПРАВИЛА В КОММЕНТЫ =====
 @bot.channel_post_handler(func=lambda message: True)
 def new_post(message):
     try:
-        # Отправляем правила НЕ В КАНАЛ, а В ГРУППУ ОБСУЖДЕНИЯ
+        # Отправляем правила в группу обсуждения
+        # Используем reply_to_message_id, чтобы ответить на сообщение о посте
         bot.send_message(
-            DISCUSSION_GROUP_ID,  # Сюда!
-            f"📢 **Новый пост!**\n\n{RULES}"
+            DISCUSSION_GROUP_ID,
+            RULES,
+            reply_to_message_id=message.message_id
         )
-        print(f"✅ Правила отправлены в группу обсуждения {DISCUSSION_GROUP_ID}")
+        print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
     except Exception as e:
-        print(f"❌ Ошибка отправки в группу: {e}")
+        print(f"❌ Ошибка: {e}")
+        # Если не получилось ответить — просто отправляем в чат
+        try:
+            bot.send_message(DISCUSSION_GROUP_ID, RULES)
+            print("✅ Правила отправлены в чат (без ответа)")
+        except Exception as e2:
+            print(f"❌ Ошибка: {e2}")
 
-# ===== МОДЕРАЦИЯ В ГРУППЕ ОБСУЖДЕНИЯ =====
+# ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
 BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
 URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
 
@@ -59,6 +66,10 @@ def moderate(message):
     
     # Проверяем, что это группа обсуждения
     if message.chat.id != DISCUSSION_GROUP_ID:
+        return
+    
+    # Если это сообщение о новом посте (от канала) — игнорируем
+    if message.from_user.id == 777000:  # ID Telegram (системные сообщения)
         return
     
     text = message.text or ""
@@ -110,7 +121,7 @@ if __name__ == "__main__":
     print("=" * 50)
     print("🤖 Бот запущен!")
     print(f"📌 Группа обсуждения: {DISCUSSION_GROUP_ID}")
-    print("📌 При новом посте - пишу правила в группу")
+    print("📌 При новом посте - пишу правила в обсуждение")
     print("📌 Удаляю мат/ссылки/спам/капс")
     print("=" * 50)
     
