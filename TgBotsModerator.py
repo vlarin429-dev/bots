@@ -2,7 +2,6 @@
 import telebot
 import re
 import time
-import threading
 
 TOKEN = "8670803464:AAE-DBwo7Nl8YoNGbDP6YPt_aUqaWdQLzqU"
 
@@ -15,6 +14,11 @@ try:
 except Exception as e:
     print(f"⚠️ Ошибка удаления webhook: {e}")
 
+# ===== ID ГРУППЫ ОБСУЖДЕНИЯ =====
+# СЮДА ВСТАВЬ ID ГРУППЫ, ГДЕ ДОЛЖНЫ БЫТЬ КОММЕНТАРИИ
+# (не канал, а группа!)
+DISCUSSION_GROUP_ID = -1002054714983  # ЗАМЕНИ НА СВОЙ ID ГРУППЫ!
+
 RULES = """
 📢 **ПРАВИЛА КОММЕНТАРИЕВ**
 
@@ -26,27 +30,24 @@ RULES = """
 Нарушение = удаление комментария.
 """
 
-# ===== КОГДА НОВЫЙ ПОСТ В КАНАЛЕ =====
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, "🤖 Бот запущен! Я буду писать правила в обсуждения.")
+
+# ===== НОВЫЙ ПОСТ В КАНАЛЕ — ПИШЕМ В ГРУППУ ОБСУЖДЕНИЯ =====
 @bot.channel_post_handler(func=lambda message: True)
 def new_post(message):
     try:
-        # Отправляем правила в чат (в группу обсуждения) КАК ОТВЕТ на сообщение о посте
+        # Отправляем правила НЕ В КАНАЛ, а В ГРУППУ ОБСУЖДЕНИЯ
         bot.send_message(
-            message.chat.id,
-            RULES,
-            reply_to_message_id=message.message_id
+            DISCUSSION_GROUP_ID,  # Сюда!
+            f"📢 **Новый пост!**\n\n{RULES}"
         )
-        print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
+        print(f"✅ Правила отправлены в группу обсуждения {DISCUSSION_GROUP_ID}")
     except Exception as e:
-        print(f"❌ Ошибка отправки правил: {e}")
-        try:
-            # Если не получилось ответить, отправляем просто в чат
-            bot.send_message(message.chat.id, RULES)
-            print("✅ Правила отправлены в чат (без ответа)")
-        except Exception as e2:
-            print(f"❌ Ошибка: {e2}")
+        print(f"❌ Ошибка отправки в группу: {e}")
 
-# ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
+# ===== МОДЕРАЦИЯ В ГРУППЕ ОБСУЖДЕНИЯ =====
 BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
 URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
 
@@ -56,8 +57,8 @@ def moderate(message):
     if message.from_user.id == bot.get_me().id:
         return
     
-    # Проверяем, что это группа
-    if message.chat.type not in ["group", "supergroup"]:
+    # Проверяем, что это группа обсуждения
+    if message.chat.id != DISCUSSION_GROUP_ID:
         return
     
     text = message.text or ""
@@ -105,14 +106,11 @@ def moderate(message):
             print(f"❌ Ошибка: {e}")
         return
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения как админа!")
-
 if __name__ == "__main__":
     print("=" * 50)
     print("🤖 Бот запущен!")
-    print("📌 При новом посте - пишу правила в обсуждение")
+    print(f"📌 Группа обсуждения: {DISCUSSION_GROUP_ID}")
+    print("📌 При новом посте - пишу правила в группу")
     print("📌 Удаляю мат/ссылки/спам/капс")
     print("=" * 50)
     
