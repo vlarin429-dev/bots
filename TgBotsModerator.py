@@ -2,6 +2,7 @@
 import telebot
 import re
 import time
+import threading
 
 TOKEN = "8670803464:AAE-DBwo7Nl8YoNGbDP6YPt_aUqaWdQLzqU"
 
@@ -25,80 +26,96 @@ RULES = """
 Нарушение = удаление комментария.
 """
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения как админа.")
+# ===== КОГДА ПОСТ В КАНАЛЕ =====
+@bot.channel_post_handler(func=lambda message: True)
+def new_post(message):
+    try:
+        # Отправляем правила в группу обсуждения (если она привязана)
+        # Используем reply_to_message_id, чтобы ответить на сообщение о новом посте
+        bot.send_message(
+            message.chat.id, 
+            RULES, 
+            reply_to_message_id=message.message_id
+        )
+        print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
+    except Exception as e:
+        print(f"❌ Ошибка отправки правил: {e}")
+        # Если не получилось ответить на пост, отправляем просто в чат
+        try:
+            bot.send_message(message.chat.id, RULES)
+            print(f"✅ Правила отправлены в чат (без ответа)")
+        except Exception as e2:
+            print(f"❌ Ошибка: {e2}")
 
-# ===== ЕСЛИ БОТ В ГРУППЕ ОБСУЖДЕНИЯ =====
-# Этот обработчик срабатывает, когда кто-то пишет в группе (включая комментарии к постам)
+# ===== КОГДА КТО-ТО ПИШЕТ В ГРУППЕ ОБСУЖДЕНИЯ =====
+BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
+URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
+
 @bot.message_handler(func=lambda message: True)
 def moderate(message):
     # Пропускаем сообщения от бота
     if message.from_user.id == bot.get_me().id:
         return
     
-    # Проверяем, что сообщение в группе/супергруппе
+    # Проверяем, что сообщение в группе/супергруппе (обсуждение)
     if message.chat.type not in ["group", "supergroup"]:
         return
     
-    # Если сообщение — это новый комментарий к посту (есть reply_to_message)
-    if message.reply_to_message:
-        # Если это ответ на пост из канала (у поста нет автора)
-        if message.reply_to_message.from_user is None:
-            # Пишем правила под каждым комментарием
-            bot.reply_to(message, RULES)
-            return
-    
-    # Если это обычное сообщение в группе — проверяем на мат/ссылку
     text = message.text or ""
     text_lower = text.lower()
     
-    # Мат
-    bad_words = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
-    for word in bad_words:
+    # ===== МАТ =====
+    for word in BAD_WORDS:
         if word in text_lower:
             try:
                 bot.delete_message(message.chat.id, message.message_id)
                 bot.send_message(message.chat.id, "⚠️ Удалено: мат")
+                print(f"🗑️ Удалён мат от {message.from_user.username}")
             except Exception as e:
-                print(f"❌ Ошибка: {e}")
+                print(f"❌ Ошибка удаления: {e}")
             return
     
-    # Ссылки
-    url_pattern = r'https?://\S+|www\.\S+|\S+\.\S+'
-    if re.search(url_pattern, text):
+    # ===== ССЫЛКИ =====
+    if re.search(URL_PATTERN, text):
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: ссылка")
+            print(f"🗑️ Удалена ссылка от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"❌ Ошибка удаления: {e}")
         return
     
-    # Спам
+    # ===== СПАМ =====
     if "!!!!!" in text or "?????" in text:
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: спам")
+            print(f"🗑️ Удалён спам от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"❌ Ошибка удаления: {e}")
         return
     
-    # Капс
+    # ===== КАПС =====
     upper = sum(1 for c in text if c.isupper())
     if len(text) > 10 and upper / len(text) > 0.7:
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: капс")
+            print(f"🗑️ Удалён капс от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"❌ Ошибка удаления: {e}")
         return
+
+# ===== ДЛЯ ПРОВЕРКИ (КОМАНДА /start) =====
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, "🤖 Бот запущен! Я буду писать правила в обсуждение к каждому посту.")
 
 if __name__ == "__main__":
     print("=" * 50)
     print("🤖 Бот запущен!")
-    print("📌 Добавь меня в группу обсуждения как админа!")
-    print("📌 Я буду писать правила под комментариями")
-    print("📌 И удалять мат/ссылки/спам/капс")
+    print("📌 При новом посте в канале - пишу правила в обсуждение")
+    print("📌 Удаляю мат/ссылки/спам/капс в комментариях")
     print("=" * 50)
     
     while True:
