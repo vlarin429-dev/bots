@@ -27,58 +27,51 @@ RULES = """
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Теперь я буду писать правила в комментарии к постам.")
+    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения как админа.")
 
-# ===== НОВЫЙ ПОСТ В КАНАЛЕ — ПИШЕМ ПРАВИЛА В КОММЕНТЫ =====
-@bot.channel_post_handler(func=lambda message: True)
-def new_post(message):
-    try:
-        # Отправляем правила КАК ОТВЕТ на пост (в комментарии)
-        bot.send_message(
-            message.chat.id, 
-            RULES, 
-            reply_to_message_id=message.message_id  # ЭТО ГЛАВНОЕ! отвечаем на пост
-        )
-        print(f"✅ Правила отправлены в комментарии к посту {message.message_id}")
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-
-# ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
-BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
-URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
-
+# ===== ЕСЛИ БОТ В ГРУППЕ ОБСУЖДЕНИЯ =====
+# Этот обработчик срабатывает, когда кто-то пишет в группе (включая комментарии к постам)
 @bot.message_handler(func=lambda message: True)
 def moderate(message):
     # Пропускаем сообщения от бота
     if message.from_user.id == bot.get_me().id:
         return
     
-    # Если это не комментарий к посту (например, ЛС) — игнорируем
+    # Проверяем, что сообщение в группе/супергруппе
     if message.chat.type not in ["group", "supergroup"]:
         return
     
+    # Если сообщение — это новый комментарий к посту (есть reply_to_message)
+    if message.reply_to_message:
+        # Если это ответ на пост из канала (у поста нет автора)
+        if message.reply_to_message.from_user is None:
+            # Пишем правила под каждым комментарием
+            bot.reply_to(message, RULES)
+            return
+    
+    # Если это обычное сообщение в группе — проверяем на мат/ссылку
     text = message.text or ""
     text_lower = text.lower()
     
     # Мат
-    for word in BAD_WORDS:
+    bad_words = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
+    for word in bad_words:
         if word in text_lower:
             try:
                 bot.delete_message(message.chat.id, message.message_id)
                 bot.send_message(message.chat.id, "⚠️ Удалено: мат")
-                print(f"🗑️ Удалён комментарий с матом от {message.from_user.username}")
             except Exception as e:
-                print(f"❌ Ошибка удаления: {e}")
+                print(f"❌ Ошибка: {e}")
             return
     
     # Ссылки
-    if re.search(URL_PATTERN, text):
+    url_pattern = r'https?://\S+|www\.\S+|\S+\.\S+'
+    if re.search(url_pattern, text):
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: ссылка")
-            print(f"🗑️ Удалён комментарий со ссылкой от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка удаления: {e}")
+            print(f"❌ Ошибка: {e}")
         return
     
     # Спам
@@ -86,9 +79,8 @@ def moderate(message):
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: спам")
-            print(f"🗑️ Удалён комментарий со спамом от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка удаления: {e}")
+            print(f"❌ Ошибка: {e}")
         return
     
     # Капс
@@ -97,16 +89,16 @@ def moderate(message):
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: капс")
-            print(f"🗑️ Удалён комментарий с капсом от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка удаления: {e}")
+            print(f"❌ Ошибка: {e}")
         return
 
 if __name__ == "__main__":
     print("=" * 50)
     print("🤖 Бот запущен!")
-    print("📌 Я буду писать правила в комментарии к постам")
-    print("📌 И удалять мат/ссылки/спам/капс в комментариях")
+    print("📌 Добавь меня в группу обсуждения как админа!")
+    print("📌 Я буду писать правила под комментариями")
+    print("📌 И удалять мат/ссылки/спам/капс")
     print("=" * 50)
     
     while True:
