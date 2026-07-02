@@ -26,28 +26,27 @@ RULES = """
 Нарушение = удаление комментария.
 """
 
-# ===== КОГДА ПОСТ В КАНАЛЕ =====
+# ===== КОГДА НОВЫЙ ПОСТ В КАНАЛЕ =====
 @bot.channel_post_handler(func=lambda message: True)
 def new_post(message):
     try:
-        # Отправляем правила в группу обсуждения (если она привязана)
-        # Используем reply_to_message_id, чтобы ответить на сообщение о новом посте
+        # Отправляем правила в чат (в группу обсуждения) КАК ОТВЕТ на сообщение о посте
         bot.send_message(
-            message.chat.id, 
-            RULES, 
+            message.chat.id,
+            RULES,
             reply_to_message_id=message.message_id
         )
         print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
     except Exception as e:
         print(f"❌ Ошибка отправки правил: {e}")
-        # Если не получилось ответить на пост, отправляем просто в чат
         try:
+            # Если не получилось ответить, отправляем просто в чат
             bot.send_message(message.chat.id, RULES)
-            print(f"✅ Правила отправлены в чат (без ответа)")
+            print("✅ Правила отправлены в чат (без ответа)")
         except Exception as e2:
             print(f"❌ Ошибка: {e2}")
 
-# ===== КОГДА КТО-ТО ПИШЕТ В ГРУППЕ ОБСУЖДЕНИЯ =====
+# ===== МОДЕРАЦИЯ КОММЕНТАРИЕВ =====
 BAD_WORDS = ["хуй", "пизда", "бля", "ебать", "залупа", "мудак", "говно", "шлюха", "сука", "пидор", "гандон", "мразь", "тварь"]
 URL_PATTERN = r'https?://\S+|www\.\S+|\S+\.\S+'
 
@@ -57,14 +56,14 @@ def moderate(message):
     if message.from_user.id == bot.get_me().id:
         return
     
-    # Проверяем, что сообщение в группе/супергруппе (обсуждение)
+    # Проверяем, что это группа
     if message.chat.type not in ["group", "supergroup"]:
         return
     
     text = message.text or ""
     text_lower = text.lower()
     
-    # ===== МАТ =====
+    # Мат
     for word in BAD_WORDS:
         if word in text_lower:
             try:
@@ -72,30 +71,30 @@ def moderate(message):
                 bot.send_message(message.chat.id, "⚠️ Удалено: мат")
                 print(f"🗑️ Удалён мат от {message.from_user.username}")
             except Exception as e:
-                print(f"❌ Ошибка удаления: {e}")
+                print(f"❌ Ошибка: {e}")
             return
     
-    # ===== ССЫЛКИ =====
+    # Ссылки
     if re.search(URL_PATTERN, text):
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: ссылка")
             print(f"🗑️ Удалена ссылка от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка удаления: {e}")
+            print(f"❌ Ошибка: {e}")
         return
     
-    # ===== СПАМ =====
+    # Спам
     if "!!!!!" in text or "?????" in text:
         try:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, "⚠️ Удалено: спам")
             print(f"🗑️ Удалён спам от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка удаления: {e}")
+            print(f"❌ Ошибка: {e}")
         return
     
-    # ===== КАПС =====
+    # Капс
     upper = sum(1 for c in text if c.isupper())
     if len(text) > 10 and upper / len(text) > 0.7:
         try:
@@ -103,19 +102,18 @@ def moderate(message):
             bot.send_message(message.chat.id, "⚠️ Удалено: капс")
             print(f"🗑️ Удалён капс от {message.from_user.username}")
         except Exception as e:
-            print(f"❌ Ошибка удаления: {e}")
+            print(f"❌ Ошибка: {e}")
         return
 
-# ===== ДЛЯ ПРОВЕРКИ (КОМАНДА /start) =====
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "🤖 Бот запущен! Я буду писать правила в обсуждение к каждому посту.")
+    bot.reply_to(message, "🤖 Бот запущен! Добавь меня в группу обсуждения как админа!")
 
 if __name__ == "__main__":
     print("=" * 50)
     print("🤖 Бот запущен!")
-    print("📌 При новом посте в канале - пишу правила в обсуждение")
-    print("📌 Удаляю мат/ссылки/спам/капс в комментариях")
+    print("📌 При новом посте - пишу правила в обсуждение")
+    print("📌 Удаляю мат/ссылки/спам/капс")
     print("=" * 50)
     
     while True:
