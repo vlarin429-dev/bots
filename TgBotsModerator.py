@@ -15,8 +15,8 @@ except Exception as e:
     print(f"⚠️ Ошибка удаления webhook: {e}")
 
 # ===== ID КАНАЛА И ГРУППЫ =====
-CHANNEL_ID = -1002120670742  # ID КАНАЛА
-DISCUSSION_GROUP_ID = -1002054714983  # ID ГРУППЫ ОБСУЖДЕНИЯ
+CHANNEL_ID = -1002120670742  # ID КАНАЛА (бот НЕ админ!)
+DISCUSSION_GROUP_ID = -1002054714983  # ID ГРУППЫ ОБСУЖДЕНИЯ (бот АДМИН!)
 
 # ===== ПРАВИЛА =====
 RULES = """Запрещено 🟡
@@ -29,7 +29,7 @@ RULES = """Запрещено 🟡
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "🤖 Мега-бот запущен!")
+    bot.reply_to(message, "🤖 Бот запущен!")
 
 @bot.message_handler(commands=['getid'])
 def get_id(message):
@@ -51,7 +51,7 @@ def is_similar(word1, word2, threshold=0.7):
     return ratio >= threshold
 
 # ============================================
-# 1. УГРОЗЫ
+# УГРОЗЫ
 # ============================================
 THREATS = [
     ("угроза", ["убью", "yбью", "убъю", "убйу", "у6ью"]),
@@ -85,7 +85,7 @@ THREATS = [
 ]
 
 # ============================================
-# 2. ОСКОРБЛЕНИЯ
+# ОСКОРБЛЕНИЯ
 # ============================================
 INSULTS = [
     ("оскорбление", ["тупой", "тyпой", "тупoй"]),
@@ -119,7 +119,7 @@ INSULTS = [
 ]
 
 # ============================================
-# 3. ДИСКРИМИНАЦИЯ
+# ДИСКРИМИНАЦИЯ
 # ============================================
 DISCRIMINATION = [
     ("дискриминация", ["нацист", "нaцист", "нацuст"]),
@@ -141,7 +141,7 @@ DISCRIMINATION = [
 ]
 
 # ============================================
-# 4. СЕКСУАЛЬНЫЕ ДОМОГАТЕЛЬСТВА
+# СЕКСУАЛЬНЫЕ ДОМОГАТЕЛЬСТВА
 # ============================================
 SEXUAL = [
     ("сексуальное домогательство", ["изнасилование", "изнacилование"]),
@@ -162,7 +162,7 @@ SEXUAL = [
 ]
 
 # ============================================
-# 5. ЭКСТРЕМИЗМ
+# ЭКСТРЕМИЗМ
 # ============================================
 EXTREMISM = [
     ("экстремизм", ["террорист", "тeррорист"]),
@@ -177,12 +177,12 @@ EXTREMISM = [
 ]
 
 # ============================================
-# ОБЪЕДИНЯЕМ ВСЁ
+# ОБЪЕДИНЯЕМ
 # ============================================
 ALL_BAD = THREATS + INSULTS + DISCRIMINATION + SEXUAL + EXTREMISM
 
 # ============================================
-# МЕГА-ФУНКЦИЯ ДЕТЕКТА
+# МЕГА-ДЕТЕКТ
 # ============================================
 def mega_detect(text):
     if not text:
@@ -190,23 +190,19 @@ def mega_detect(text):
     
     text_lower = text.lower()
     
-    # ПРЯМАЯ ПРОВЕРКА
     for category_name, variants in ALL_BAD:
         for variant in variants:
             if variant in text_lower:
                 return True, category_name
             
-            # Убираем пробелы
             no_spaces = re.sub(r'\s+', '', text_lower)
             if variant in no_spaces:
                 return True, category_name
             
-            # Убираем дубли
             no_duplicates = re.sub(r'(.)\1{2,}', r'\1', text_lower)
             if variant in no_duplicates:
                 return True, category_name
     
-    # ПРОВЕРКА НА ПОХОЖЕСТЬ
     words = re.findall(r'[a-zA-Zа-яА-Я]{3,}', text_lower)
     for word in words:
         for category_name, variants in ALL_BAD:
@@ -214,7 +210,6 @@ def mega_detect(text):
                 if is_similar(word, variant):
                     return True, category_name
     
-    # ЗАМЕНА ЛАТИНИЦЫ
     replacements = {
         'a': 'а', 'e': 'е', 'o': 'о', 'p': 'р', 'c': 'с',
         'y': 'у', 'x': 'х', 'b': 'в', 'h': 'н', 'k': 'к'
@@ -230,31 +225,19 @@ def mega_detect(text):
     return False, ""
 
 # ============================================
-# НОВЫЙ ПОСТ В КАНАЛЕ - ПИШЕМ ПРАВИЛА В КОММЕНТЫ
+# НОВЫЙ ПОСТ В КАНАЛЕ
 # ============================================
 @bot.channel_post_handler(func=lambda message: True)
 def new_post(message):
     try:
-        # Отправляем правила КАК ОТВЕТ на пост (в комментарии)
+        # Отправляем правила в группу обсуждения (это автоматически станет комментарием)
         bot.send_message(
-            CHANNEL_ID,
-            RULES,
-            reply_to_message_id=message.message_id
+            DISCUSSION_GROUP_ID,
+            f"📢 Новый пост!\n\n{RULES}"
         )
-        print(f"✅ Правила отправлены в комментарии к посту {message.message_id}")
-        
-        # Также отправляем в группу обсуждения
-        bot.send_message(DISCUSSION_GROUP_ID, f"📢 Новый пост!\n\n{RULES}")
-        print(f"✅ Правила отправлены в группу обсуждения")
-        
+        print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
     except Exception as e:
         print(f"❌ Ошибка: {e}")
-        # Если не получилось ответить на пост - отправляем просто в чат
-        try:
-            bot.send_message(CHANNEL_ID, RULES)
-            print("✅ Правила отправлены в канал (без ответа)")
-        except Exception as e2:
-            print(f"❌ Ошибка: {e2}")
 
 # ============================================
 # ОБРАБОТЧИК СООБЩЕНИЙ В ГРУППЕ ОБСУЖДЕНИЯ
@@ -276,7 +259,6 @@ def handle_messages(message):
     
     if is_bad:
         try:
-            # Удаляем сообщение из группы
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(
                 message.chat.id,
@@ -300,10 +282,10 @@ def handle_messages(message):
             print(f"❌ Ошибка: {e}")
         return
     
-    # ПЕРЕСЫЛКА В КАНАЛ (как комментарий)
+    # Если сообщение чистое - пересылаем в канал (как комментарий)
     if text:
         try:
-            # Пересылаем в канал
+            # Пересылаем сообщение в канал
             bot.forward_message(CHANNEL_ID, message.chat.id, message.message_id)
             print(f"📩 Переслано в канал от {message.from_user.username}")
         except Exception as e:
@@ -312,10 +294,10 @@ def handle_messages(message):
 if __name__ == "__main__":
     print("=" * 50)
     print("🤖 БОТ ЗАПУЩЕН!")
-    print(f"📌 Группа обсуждения: {DISCUSSION_GROUP_ID}")
-    print(f"📌 Канал: {CHANNEL_ID}")
-    print("📌 Правила → в комментарии к посту")
-    print("📌 Фильтрация: угрозы, оскорбления, дискриминация, экстремизм, секс")
+    print(f"📌 Канал (бот НЕ админ): {CHANNEL_ID}")
+    print(f"📌 Обсуждение (бот АДМИН): {DISCUSSION_GROUP_ID}")
+    print("📌 Правила → в обсуждение (становятся комментариями)")
+    print("📌 Чистые сообщения → пересылаются в канал")
     print("=" * 50)
     
     while True:
