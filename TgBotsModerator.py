@@ -230,21 +230,31 @@ def mega_detect(text):
     return False, ""
 
 # ============================================
-# НОВЫЙ ПОСТ В КАНАЛЕ - ПИШЕМ ПРАВИЛА В ОБСУЖДЕНИЕ
+# НОВЫЙ ПОСТ В КАНАЛЕ - ПИШЕМ ПРАВИЛА В КОММЕНТЫ
 # ============================================
 @bot.channel_post_handler(func=lambda message: True)
 def new_post(message):
     try:
-        # Отправляем правила в группу обсуждения
-        msg = bot.send_message(DISCUSSION_GROUP_ID, RULES)
-        print(f"✅ Правила отправлены в обсуждение к посту {message.message_id}")
+        # Отправляем правила КАК ОТВЕТ на пост (в комментарии)
+        bot.send_message(
+            CHANNEL_ID,
+            RULES,
+            reply_to_message_id=message.message_id
+        )
+        print(f"✅ Правила отправлены в комментарии к посту {message.message_id}")
         
-        # Дублируем правила в канал (как комментарий)
-        bot.forward_message(CHANNEL_ID, DISCUSSION_GROUP_ID, msg.message_id)
-        print(f"✅ Правила продублированы в канал")
+        # Также отправляем в группу обсуждения
+        bot.send_message(DISCUSSION_GROUP_ID, f"📢 Новый пост!\n\n{RULES}")
+        print(f"✅ Правила отправлены в группу обсуждения")
         
     except Exception as e:
         print(f"❌ Ошибка: {e}")
+        # Если не получилось ответить на пост - отправляем просто в чат
+        try:
+            bot.send_message(CHANNEL_ID, RULES)
+            print("✅ Правила отправлены в канал (без ответа)")
+        except Exception as e2:
+            print(f"❌ Ошибка: {e2}")
 
 # ============================================
 # ОБРАБОТЧИК СООБЩЕНИЙ В ГРУППЕ ОБСУЖДЕНИЯ
@@ -304,7 +314,7 @@ if __name__ == "__main__":
     print("🤖 БОТ ЗАПУЩЕН!")
     print(f"📌 Группа обсуждения: {DISCUSSION_GROUP_ID}")
     print(f"📌 Канал: {CHANNEL_ID}")
-    print("📌 Правила → обсуждение → дубль в канал")
+    print("📌 Правила → в комментарии к посту")
     print("📌 Фильтрация: угрозы, оскорбления, дискриминация, экстремизм, секс")
     print("=" * 50)
     
