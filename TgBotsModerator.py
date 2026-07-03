@@ -7,18 +7,15 @@ TOKEN = "8670803464:AAE-DBwo7Nl8YoNGbDP6YPt_aUqaWdQLzqU"
 
 bot = telebot.TeleBot(TOKEN)
 
-# ===== УДАЛЯЕМ WEBHOOK =====
 try:
     bot.remove_webhook()
     print("✅ Webhook удалён")
 except Exception as e:
     print(f"⚠️ Ошибка удаления webhook: {e}")
 
-# ===== ID КАНАЛА И ГРУППЫ =====
-CHANNEL_ID = -1002120670742  # ID КАНАЛА (бот НЕ админ!)
-DISCUSSION_GROUP_ID = -1002054714983  # ID ГРУППЫ ОБСУЖДЕНИЯ (бот АДМИН!)
+CHANNEL_ID = -1002120670742
+DISCUSSION_GROUP_ID = -1002054714983
 
-# ===== ПРАВИЛА =====
 RULES = """📢 **ПРАВИЛА КОММЕНТАРИЕВ**
 
 🚫 **ЗАПРЕЩЕНО:**
@@ -44,10 +41,6 @@ def send_rules(message):
 def get_id(message):
     bot.reply_to(message, f"🆔 ID: `{message.chat.id}`")
 
-# =====================================================
-# ФУНКЦИИ ДЕТЕКТА
-# =====================================================
-
 def clean_text(text):
     text = re.sub(r'[^a-zA-Zа-яА-Я]', '', text)
     return text.lower()
@@ -58,10 +51,6 @@ def is_similar(word1, word2, threshold=0.7):
     matches = sum(1 for a, b in zip(word1, word2) if a == b)
     ratio = matches / max(len(word1), len(word2))
     return ratio >= threshold
-
-# ============================================
-# БАЗА ЗАПРЕТОВ
-# ============================================
 
 THREATS = [
     ("угроза", ["убью", "yбью", "убъю", "убйу"]),
@@ -169,23 +158,14 @@ def mega_detect(text):
     
     return False, ""
 
-# ============================================
-# ГЛАВНЫЙ ОБРАБОТЧИК
-# ============================================
-
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
-    # Пропускаем сообщения от бота
     if message.from_user.id == bot.get_me().id:
         return
     
-    # === ЕСЛИ СООБЩЕНИЕ В ГРУППЕ ОБСУЖДЕНИЯ ===
     if message.chat.id == DISCUSSION_GROUP_ID:
         text = message.text or ""
         
-        # === ПРОВЕРКА: ЭТО СИСТЕМНОЕ СООБЩЕНИЕ О НОВОМ ПОСТЕ ===
-        # ID 777000 - это системный аккаунт Telegram
-        # ИЛИ сообщение с заголовком (содержит ссылку на канал)
         is_system_post = (
             message.from_user.id == 777000 or 
             (message.forward_from_chat and message.forward_from_chat.id == CHANNEL_ID) or
@@ -193,26 +173,21 @@ def handle_all_messages(message):
         )
         
         if is_system_post:
-            # Это НОВЫЙ ПОСТ в канале - отвечаем правилами
             try:
                 bot.reply_to(message, RULES)
                 print("✅ Правила отправлены в ответ на новый пост")
             except Exception as e:
                 print(f"❌ Ошибка отправки правил: {e}")
-            # ВАЖНО: НЕ ПЕРЕСЫЛАЕМ ЭТО СООБЩЕНИЕ В КАНАЛ!
             return
         
-        # === ЕСЛИ СООБЩЕНИЕ ПЕРЕСЛАНО ИЗ КАНАЛА ===
         if message.forward_from_chat and message.forward_from_chat.id == CHANNEL_ID:
             print(f"⏭️ Пропускаем пересланное из канала сообщение")
             return
         
-        # === ЕСЛИ СООБЩЕНИЕ СОДЕРЖИТ ССЫЛКУ НА КАНАЛ ===
         if text and "t.me/" in text and CHANNEL_ID in str(text):
             print(f"⏭️ Пропускаем сообщение со ссылкой на канал")
             return
         
-        # === МОДЕРАЦИЯ ОБЫЧНЫХ КОММЕНТАРИЕВ ===
         is_bad, reason = mega_detect(text)
         
         if is_bad:
@@ -224,7 +199,6 @@ def handle_all_messages(message):
                 print(f"❌ Ошибка удаления: {e}")
             return
         
-        # ССЫЛКИ
         if re.search(r'https?://\S+|www\.\S+', text):
             try:
                 bot.delete_message(message.chat.id, message.message_id)
@@ -234,8 +208,6 @@ def handle_all_messages(message):
                 print(f"❌ Ошибка: {e}")
             return
         
-        # === ПЕРЕСЫЛАЕМ ТОЛЬКО ЕСЛИ ЭТО НЕ СИСТЕМНОЕ СООБЩЕНИЕ ===
-        # И не пересланное из канала, и не от бота
         if text and not is_system_post and not message.forward_from_chat:
             try:
                 bot.forward_message(CHANNEL_ID, message.chat.id, message.message_id)
@@ -245,7 +217,6 @@ def handle_all_messages(message):
         
         return
     
-    # === ЛИЧНЫЕ СООБЩЕНИЯ БОТУ ===
     if message.chat.type == "private":
         if text.startswith("/"):
             return
